@@ -16,7 +16,7 @@ export default function Home({ initialItems }) {
 
   const brands = useMemo(() => {
     const set = new Set(items.map((i) => i.brand).filter(Boolean))
-    return Array.from(set).sort()
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
   }, [items])
 
   const itemTypes = useMemo(() => {
