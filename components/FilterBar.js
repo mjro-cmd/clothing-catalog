@@ -1,4 +1,4 @@
-import { ITEMS, COLORS, PATTERNS, OWNERS } from '../lib/constants'
+import { OWNERS } from '../lib/constants'
 
 function Chip({ label, active, onClick }) {
   return (
@@ -31,7 +31,7 @@ function FilterGroup({ title, options, selected, onToggle }) {
   )
 }
 
-export default function FilterBar({ filters, brands, onChange }) {
+export default function FilterBar({ filters, brands, itemTypes, colors, patterns, onChange }) {
   function toggle(key, value) {
     const current = filters[key]
     const next = current.includes(value)
@@ -49,9 +49,9 @@ export default function FilterBar({ filters, brands, onChange }) {
   return (
     <div className="space-y-2.5">
       <FilterGroup title="Who"     options={OWNERS}   selected={filters.owner}   onToggle={(v) => toggle('owner', v)} />
-      <FilterGroup title="Item"    options={ITEMS}    selected={filters.item}    onToggle={(v) => toggle('item', v)} />
-      <FilterGroup title="Color"   options={COLORS}   selected={filters.color}   onToggle={(v) => toggle('color', v)} />
-      <FilterGroup title="Pattern" options={PATTERNS} selected={filters.pattern} onToggle={(v) => toggle('pattern', v)} />
+      <FilterGroup title="Item"    options={itemTypes} selected={filters.item}   onToggle={(v) => toggle('item', v)} />
+      <FilterGroup title="Color"   options={colors}   selected={filters.color}   onToggle={(v) => toggle('color', v)} />
+      <FilterGroup title="Pattern" options={patterns} selected={filters.pattern} onToggle={(v) => toggle('pattern', v)} />
       <FilterGroup title="Brand"   options={brands}   selected={filters.brand}   onToggle={(v) => toggle('brand', v)} />
       {hasActive && (
         <button onClick={clearAll} className="text-xs text-gray-300 hover:text-gray-500 underline underline-offset-2 transition-colors ml-16">

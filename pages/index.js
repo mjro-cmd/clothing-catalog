@@ -19,6 +19,21 @@ export default function Home({ initialItems }) {
     return Array.from(set).sort()
   }, [items])
 
+  const itemTypes = useMemo(() => {
+    const set = new Set(items.map((i) => i.item).filter(Boolean))
+    return Array.from(set).sort()
+  }, [items])
+
+  const colors = useMemo(() => {
+    const set = new Set(items.flatMap((i) => i.colors || []).filter(Boolean))
+    return Array.from(set).sort()
+  }, [items])
+
+  const patterns = useMemo(() => {
+    const set = new Set(items.map((i) => i.pattern).filter(Boolean))
+    return Array.from(set).sort()
+  }, [items])
+
   const filtered = useMemo(() => {
     return items.filter((item) => {
       if (filters.owner.length   && !filters.owner.includes(item.owner))     return false
@@ -72,7 +87,7 @@ export default function Home({ initialItems }) {
         {/* Filter panel */}
         {filtersOpen && (
           <div className="border-t border-gray-100 bg-white px-4 py-4 max-w-2xl mx-auto">
-            <FilterBar filters={filters} brands={brands} onChange={setFilters} />
+            <FilterBar filters={filters} brands={brands} itemTypes={itemTypes} colors={colors} patterns={patterns} onChange={setFilters} />
           </div>
         )}
       </header>
