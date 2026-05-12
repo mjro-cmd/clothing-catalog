@@ -2,10 +2,16 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../auth/[...nextauth]'
 import { AIRTABLE_BASE_URL, AIRTABLE_HEADERS } from '../../../../lib/airtable'
 
-const REMBG_VERSION = 'fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003'
+const REMBG_VERSION = process.env.REMBG_VERSION || 'fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003'
+
+const ALLOWED_PHOTO_HOSTS = ['airtableusercontent.com', 'dl.airtable.com', 'replicate.delivery']
 
 async function removeBg(imageUrl) {
-  // Start prediction using versioned endpoint
+  const host = new URL(imageUrl).hostname
+  if (!ALLOWED_PHOTO_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+    throw new Error('Invalid photo URL')
+  }
+
   const resp = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
@@ -68,7 +74,7 @@ export default async function handler(req, res) {
     res.status(200).json({ success: true, photoUrl: cleanedUrl })
   } catch (err) {
     console.error('remove-bg error:', err)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'Background removal failed' })
   }
 }
 

@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   const { id } = req.query
   const { degrees } = req.body
 
-  if (degrees === undefined) return res.status(400).json({ error: 'degrees required' })
+  if (![0, 90, 180, 270].includes(degrees)) return res.status(400).json({ error: 'degrees must be 0, 90, 180, or 270' })
 
   try {
     const patchResp = await fetch(`${AIRTABLE_BASE_URL}/${id}`, {
@@ -24,6 +24,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true })
   } catch (err) {
     console.error('rotate error:', err)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Could not save rotation' })
   }
 }

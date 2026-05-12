@@ -72,7 +72,7 @@ export default function ItemModal({ item, onClose, onSave }) {
     setForm((f) => ({ ...f, [key]: val }))
   }
 
-  async function handleRotate() {
+  function handleRotate() {
     const newRotation = (rotation + 90) % 360
     setRotation(newRotation)
   }
@@ -89,6 +89,7 @@ export default function ItemModal({ item, onClose, onSave }) {
       if (!resp.ok) throw new Error('Rotation failed')
       onSave({ ...item, ...form, photoUrl, rotation })
     } catch (err) {
+      console.error('handleSaveRotation:', err)
       setError('Could not save rotation. Please try again.')
     } finally {
       setRotating(false)
@@ -109,6 +110,7 @@ export default function ItemModal({ item, onClose, onSave }) {
       setPhotoUrl(data.photoUrl)
       onSave({ ...item, ...form, photoUrl: data.photoUrl })
     } catch (err) {
+      console.error('handleRemoveBg:', err)
       setError('Background removal failed. Please try again.')
     } finally {
       setRemovingBg(false)
@@ -128,6 +130,7 @@ export default function ItemModal({ item, onClose, onSave }) {
       onSave({ ...item, ...form, photoUrl, rotation })
       onClose()
     } catch (err) {
+      console.error('handleSave:', err)
       setError('Could not save. Please try again.')
     } finally {
       setSaving(false)
@@ -160,7 +163,6 @@ export default function ItemModal({ item, onClose, onSave }) {
                 alt={item.item || 'Item'}
                 fill
                 className="object-contain"
-                unoptimized
               />
             </div>
           ) : (
