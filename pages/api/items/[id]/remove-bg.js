@@ -66,7 +66,17 @@ export default async function handler(req, res) {
   try {
     const cleanedUrl = await removeBg(photoUrl)
     await updateAirtablePhoto(id, cleanedUrl)
-    res.status(200).json({ success: true, photoUrl: cleanedUrl })
+
+    // Fetch the updated record to get the Airtable-hosted URL
+    const recordResp = await fetch(
+      `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_NAME}/${id}`,
+      { headers: { Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}` } }
+    )
+    const record = await recordResp.json()
+    const newPhotoUrl = record.fields?.Photo?.[0]?.url || cleanedUrl
+
+    await res.revalidate('/')
+    res.status(200).json({ success: true, photoUrl: newPhotoUrl })
   } catch (err) {
     console.error('remove-bg error:', err)
     res.status(500).json({ error: err.message })
