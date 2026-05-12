@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   const { id } = req.query
 
   if (req.method === 'PATCH') {
-    const { item, colors, material, pattern, brand, owner, size, location, boxName, comments } = req.body
+    const { item, colors, material, pattern, brand, owner, size, location, boxName, comments, rotation } = req.body
 
     const fields = {}
     if (item     !== undefined) fields['Item']     = item     || null
@@ -27,6 +27,7 @@ export default async function handler(req, res) {
     if (location !== undefined) fields['Location'] = location || null
     if (boxName  !== undefined) fields['Box Name'] = boxName  || null
     if (comments !== undefined) fields['Comments'] = comments || null
+    if (rotation !== undefined) fields['Rotation'] = rotation
 
     try {
       const resp = await fetch(`${AIRTABLE_BASE_URL}/${id}`, {

@@ -69,7 +69,7 @@ export default function ItemModal({ item, onClose, onSave }) {
   const [removingBg, setRemovingBg] = useState(false)
   const [rotating, setRotating]     = useState(false)
   const [photoUrl, setPhotoUrl]     = useState(item.photoUrl)
-  const [rotation, setRotation]     = useState(0)
+  const [rotation, setRotation]     = useState(item.rotation || 0)
   const [error, setError]           = useState(null)
 
   function set(key, val) {
@@ -82,20 +82,16 @@ export default function ItemModal({ item, onClose, onSave }) {
   }
 
   async function handleSaveRotation() {
-    if (rotation === 0) return
     setRotating(true)
     setError(null)
     try {
       const resp = await fetch(`/api/items/${item.id}/rotate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoUrl, degrees: rotation }),
+        body: JSON.stringify({ degrees: rotation }),
       })
       if (!resp.ok) throw new Error('Rotation failed')
-      const data = await resp.json()
-      setPhotoUrl(data.photoUrl)
-      setRotation(0)
-      onSave({ ...item, ...form, photoUrl: data.photoUrl })
+      onSave({ ...item, ...form, photoUrl, rotation })
     } catch (err) {
       setError('Could not save rotation. Please try again.')
     } finally {
@@ -194,7 +190,7 @@ export default function ItemModal({ item, onClose, onSave }) {
                 >
                   ↻
                 </button>
-                {rotation !== 0 && (
+                {rotation !== (item.rotation || 0) && (
                   <button
                     onClick={handleSaveRotation}
                     disabled={rotating}

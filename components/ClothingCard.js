@@ -12,6 +12,7 @@ export default function ClothingCard({ item, onClick, priority }) {
             priority={priority}
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 20vw"
+            style={{ transform: `rotate(${item.rotation || 0}deg)` }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-200 text-xs">
