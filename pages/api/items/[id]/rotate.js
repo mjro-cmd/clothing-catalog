@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../auth/[...nextauth]'
 import sharp from 'sharp'
+import { put, del } from '@vercel/blob'
 
 const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodeURIComponent(process.env.AIRTABLE_TABLE_NAME)}`
 const AIRTABLE_HEADERS  = {
@@ -18,52 +19,49 @@ export default async function handler(req, res) {
 
   if (!photoUrl || !degrees) return res.status(400).json({ error: 'photoUrl and degrees required' })
 
+  let blobUrl = null
+
   try {
-    // Fetch the original image
+    // 1. Fetch original image
     const imgResp = await fetch(photoUrl)
     if (!imgResp.ok) throw new Error(`Failed to fetch image: ${imgResp.status}`)
     const imgBuffer = Buffer.from(await imgResp.arrayBuffer())
 
-    // Rotate with sharp
-    const rotated = await sharp(imgBuffer).rotate(degrees).toBuffer()
+    // 2. Rotate with sharp
+    const rotated = await sharp(imgBuffer).rotate(degrees).jpeg().toBuffer()
 
-    // Upload via multipart/form-data to Airtable's upload endpoint
-    const uploadUrl = `https://content.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${id}/Photo/uploadAttachment`
-    const formData = new FormData()
-    const blob = new Blob([rotated], { type: 'image/jpeg' })
-    formData.append('file', blob, 'photo-rotated.jpg')
-
-    const uploadResp = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}` },
-      body: formData,
+    // 3. Upload to Vercel Blob to get a public URL
+    const blob = await put(`rotated-${id}-${Date.now()}.jpg`, rotated, {
+      access: 'public',
+      contentType: 'image/jpeg',
     })
+    blobUrl = blob.url
 
-    if (!uploadResp.ok) {
-      const errText = await uploadResp.text()
-      throw new Error(`Upload failed ${uploadResp.status}: ${errText}`)
-    }
+    // 4. PATCH Airtable with the public URL (Airtable downloads and stores it)
+    const patchResp = await fetch(`${AIRTABLE_BASE_URL}/${id}`, {
+      method: 'PATCH',
+      headers: AIRTABLE_HEADERS,
+      body: JSON.stringify({
+        fields: { Photo: [{ url: blobUrl, filename: 'photo-rotated.jpg' }] },
+      }),
+    })
+    if (!patchResp.ok) throw new Error(`Airtable PATCH failed: ${await patchResp.text()}`)
 
-    // Fetch updated record to get new photo URL
+    // 5. Fetch updated record to get the Airtable-hosted URL
     const recordResp = await fetch(`${AIRTABLE_BASE_URL}/${id}`, {
       headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}` },
     })
     const record = await recordResp.json()
-    const attachments = record.fields?.Photo || []
-    const newPhotoUrl = attachments[attachments.length - 1]?.url || photoUrl
+    const newPhotoUrl = record.fields?.Photo?.[0]?.url || blobUrl
 
-    // Keep only the newest attachment
-    await fetch(`${AIRTABLE_BASE_URL}/${id}`, {
-      method: 'PATCH',
-      headers: AIRTABLE_HEADERS,
-      body: JSON.stringify({
-        fields: { Photo: [{ id: attachments[attachments.length - 1]?.id }] },
-      }),
-    })
+    // 6. Clean up the temporary blob
+    await del(blobUrl)
 
     return res.status(200).json({ success: true, photoUrl: newPhotoUrl })
   } catch (err) {
     console.error('rotate error:', err)
+    // Clean up blob if Airtable update failed
+    if (blobUrl) await del(blobUrl).catch(() => {})
     return res.status(500).json({ error: err.message })
   }
 }
