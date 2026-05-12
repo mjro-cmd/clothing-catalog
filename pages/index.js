@@ -1,6 +1,5 @@
-import { signOut, useSession } from 'next-auth/react'
-import { useRouter } from 'next/router'
-import { useState, useMemo, useEffect } from 'react'
+import { signOut } from 'next-auth/react'
+import { useState, useMemo } from 'react'
 import { getAllItems } from '../lib/airtable'
 import ClothingCard from '../components/ClothingCard'
 import FilterBar from '../components/FilterBar'
@@ -10,8 +9,6 @@ import ItemModal from '../components/ItemModal'
 const EMPTY_FILTERS = { owner: [], item: [], color: [], pattern: [], brand: [] }
 
 export default function Home({ initialItems }) {
-  const { data: session, status } = useSession()
-  const router = useRouter()
   const [items, setItems]           = useState(initialItems)
   const [filters, setFilters]       = useState(EMPTY_FILTERS)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -32,13 +29,6 @@ export default function Home({ initialItems }) {
       return true
     })
   }, [items, filters])
-
-  // Auth redirect — in an effect so it never fires mid-render
-  useEffect(() => {
-    if (status === 'unauthenticated') router.replace('/login')
-  }, [status, router])
-
-  if (status !== 'authenticated') return null
 
   function handleSave(updated) {
     setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i))
