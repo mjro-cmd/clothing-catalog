@@ -13,6 +13,9 @@ export const authOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
   ],
+  session: {
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   callbacks: {
     async signIn({ user }) {
       return ALLOWED_EMAILS.includes(user.email)
