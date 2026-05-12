@@ -129,7 +129,7 @@ export default function ItemModal({ item, onClose, onSave }) {
         body: JSON.stringify(form),
       })
       if (!resp.ok) throw new Error('Save failed')
-      onSave({ ...item, ...form })
+      onSave({ ...item, ...form, photoUrl, rotation })
       onClose()
     } catch (err) {
       setError('Could not save. Please try again.')
