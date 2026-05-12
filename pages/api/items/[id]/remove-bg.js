@@ -1,11 +1,6 @@
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../auth/[...nextauth]'
-
-const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_NAME}`
-const AIRTABLE_HEADERS  = {
-  'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
-  'Content-Type': 'application/json',
-}
+import { AIRTABLE_BASE_URL, AIRTABLE_HEADERS } from '../../../../lib/airtable'
 
 const REMBG_VERSION = 'fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003'
 
