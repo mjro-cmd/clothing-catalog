@@ -65,13 +65,42 @@ export default function ItemModal({ item, onClose, onSave }) {
     boxName:  item.boxName  || '',
     comments: item.comments || '',
   })
-  const [saving, setSaving]       = useState(false)
+  const [saving, setSaving]         = useState(false)
   const [removingBg, setRemovingBg] = useState(false)
-  const [photoUrl, setPhotoUrl]   = useState(item.photoUrl)
-  const [error, setError]         = useState(null)
+  const [rotating, setRotating]     = useState(false)
+  const [photoUrl, setPhotoUrl]     = useState(item.photoUrl)
+  const [rotation, setRotation]     = useState(0)
+  const [error, setError]           = useState(null)
 
   function set(key, val) {
     setForm((f) => ({ ...f, [key]: val }))
+  }
+
+  async function handleRotate() {
+    const newRotation = (rotation + 90) % 360
+    setRotation(newRotation)
+  }
+
+  async function handleSaveRotation() {
+    if (rotation === 0) return
+    setRotating(true)
+    setError(null)
+    try {
+      const resp = await fetch(`/api/items/${item.id}/rotate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoUrl, degrees: rotation }),
+      })
+      if (!resp.ok) throw new Error('Rotation failed')
+      const data = await resp.json()
+      setPhotoUrl(data.photoUrl)
+      setRotation(0)
+      onSave({ ...item, ...form, photoUrl: data.photoUrl })
+    } catch (err) {
+      setError('Could not save rotation. Please try again.')
+    } finally {
+      setRotating(false)
+    }
   }
 
   async function handleRemoveBg() {
@@ -128,32 +157,63 @@ export default function ItemModal({ item, onClose, onSave }) {
         </div>
 
         {/* Photo */}
-        <div className="relative w-full aspect-square bg-gray-50">
+        <div className="relative w-full aspect-square bg-gray-50 overflow-hidden">
           {photoUrl ? (
-            <Image
-              src={photoUrl}
-              alt={item.item || 'Item'}
-              fill
-              className="object-contain"
-              unoptimized
-            />
+            <div
+              className="absolute inset-0 transition-transform duration-300"
+              style={{ transform: `rotate(${rotation}deg)` }}
+            >
+              <Image
+                src={photoUrl}
+                alt={item.item || 'Item'}
+                fill
+                className="object-contain"
+                unoptimized
+              />
+            </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-200 text-sm">No photo</div>
           )}
+
+          {/* Close */}
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 bg-white/90 rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 shadow-sm"
+            className="absolute top-3 right-3 bg-white/90 rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 shadow-sm z-10"
           >
             ✕
           </button>
+
           {photoUrl && (
-            <button
-              onClick={handleRemoveBg}
-              disabled={removingBg}
-              className="absolute bottom-3 right-3 bg-white/90 rounded-full px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 shadow-sm disabled:opacity-50 transition-colors"
-            >
-              {removingBg ? 'Removing…' : '✦ Remove bg'}
-            </button>
+            <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center z-10">
+              {/* Rotate controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRotate}
+                  className="bg-white/90 rounded-full w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-900 shadow-sm text-base"
+                  title="Rotate 90°"
+                >
+                  ↻
+                </button>
+                {rotation !== 0 && (
+                  <button
+                    onClick={handleSaveRotation}
+                    disabled={rotating}
+                    className="bg-gray-900/90 text-white rounded-full px-3 py-1.5 text-xs shadow-sm disabled:opacity-50 transition-colors"
+                  >
+                    {rotating ? 'Saving…' : 'Save rotation'}
+                  </button>
+                )}
+              </div>
+
+              {/* Remove bg */}
+              <button
+                onClick={handleRemoveBg}
+                disabled={removingBg}
+                className="bg-white/90 rounded-full px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 shadow-sm disabled:opacity-50 transition-colors"
+              >
+                {removingBg ? 'Removing…' : '✦ Remove bg'}
+              </button>
+            </div>
           )}
         </div>
 
