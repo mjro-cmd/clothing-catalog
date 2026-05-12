@@ -27,17 +27,16 @@ export default async function handler(req, res) {
     // Rotate with sharp
     const rotated = await sharp(imgBuffer).rotate(degrees).toBuffer()
 
-    // Upload rotated image to Airtable via PATCH with content URL
-    // First upload to get a hosted URL — use Airtable's upload endpoint
+    // Upload via multipart/form-data to Airtable's upload endpoint
     const uploadUrl = `https://content.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${id}/Photo/uploadAttachment`
+    const formData = new FormData()
+    const blob = new Blob([rotated], { type: 'image/jpeg' })
+    formData.append('file', blob, 'photo-rotated.jpg')
+
     const uploadResp = await fetch(uploadUrl, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/octet-stream',
-        'x-airtable-attachment-filename': 'photo-rotated.jpg',
-      },
-      body: rotated,
+      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}` },
+      body: formData,
     })
 
     if (!uploadResp.ok) {
