@@ -1,6 +1,6 @@
 import { signOut, useSession } from 'next-auth/react'
 import { useRouter } from 'next/router'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { getAllItems } from '../lib/airtable'
 import ClothingCard from '../components/ClothingCard'
 import FilterBar from '../components/FilterBar'
@@ -33,12 +33,12 @@ export default function Home({ initialItems }) {
     })
   }, [items, filters])
 
-  // Auth check — must come after all hooks
-  if (status === 'loading') return null
-  if (status === 'unauthenticated') {
-    router.replace('/login')
-    return null
-  }
+  // Auth redirect — in an effect so it never fires mid-render
+  useEffect(() => {
+    if (status === 'unauthenticated') router.replace('/login')
+  }, [status, router])
+
+  if (status !== 'authenticated') return null
 
   function handleSave(updated) {
     setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i))
