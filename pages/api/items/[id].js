@@ -36,6 +36,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({ fields }),
       })
       if (!resp.ok) throw new Error(await resp.text())
+      await res.revalidate('/')
       return res.status(200).json({ success: true })
     } catch (err) {
       console.error('Airtable update error:', err)

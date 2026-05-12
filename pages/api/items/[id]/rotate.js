@@ -25,6 +25,7 @@ export default async function handler(req, res) {
     })
     if (!patchResp.ok) throw new Error(`Airtable PATCH failed: ${await patchResp.text()}`)
 
+    await res.revalidate('/')
     return res.status(200).json({ success: true })
   } catch (err) {
     console.error('rotate error:', err)
