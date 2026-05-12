@@ -1,10 +1,6 @@
 import { useState } from 'react'
 import Image from 'next/image'
-
-const ITEMS    = ['T-Shirt', 'Pants', 'Sweater', 'Hoodie', 'Blouse']
-const COLORS   = ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Black', 'White', 'Gray']
-const PATTERNS = ['Solid', 'Striped', 'Plaid', 'Floral', 'Graphic']
-const OWNERS   = ['PT', 'MJ']
+import { ITEMS, COLORS, PATTERNS, OWNERS } from '../lib/constants'
 
 function SingleSelect({ options, value, onChange }) {
   return (
