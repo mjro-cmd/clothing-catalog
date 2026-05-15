@@ -15,8 +15,21 @@ async function toBase64(url) {
 
 const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodeURIComponent(process.env.AIRTABLE_TABLE_NAME)}`
 
-async function getEligibleItems(owners, categories) {
-  const records = []
+// Items excluded at each formality level
+const FORMALITY_EXCLUDE = {
+  'Casual':       [],
+  'Smart Casual': ['Pjs (long)', 'Pjs (short)', 'Shorts (workout)', 'Leggings (workout)',
+                   'Long sleeve (workout)', 'T shirt (workout)', 'Specialized workout',
+                   'Underwear', 'Sweatpants'],
+  'Formal':       ['Pjs (long)', 'Pjs (short)', 'Shorts (workout)', 'Leggings (workout)',
+                   'Long sleeve (workout)', 'T shirt (workout)', 'Specialized workout',
+                   'Underwear', 'Sweatpants', 'Fleece', 'Hoodie', 'Shorts (normal)',
+                   'T-Shirt', 'T shirt (workout)'],
+}
+
+async function getEligibleItems(owners, categories, formality) {
+  const excluded = FORMALITY_EXCLUDE[formality] || []
+  const records  = []
   let offset = null
   do {
     const params = new URLSearchParams({ pageSize: '100' })
@@ -27,10 +40,11 @@ async function getEligibleItems(owners, categories) {
     const data = await resp.json()
     for (const record of data.records) {
       const fields = record.fields
-      const photo   = fields['Photo']
-      if (!photo?.[0]?.url) continue
-      if (owners.length     && !owners.includes(fields['Owner']))     continue
-      if (categories.length && !categories.includes(fields['Item']))  continue
+      const photo  = fields['Photo']
+      if (!photo?.[0]?.url)                                     continue
+      if (owners.length     && !owners.includes(fields['Owner']))    continue
+      if (categories.length && !categories.includes(fields['Item'])) continue
+      if (excluded.includes(fields['Item']))                         continue
       records.push({
         id:       record.id,
         owner:    fields['Owner']    || null,
@@ -47,23 +61,67 @@ async function getEligibleItems(owners, categories) {
   return records
 }
 
+async function critiqueOutfits(outfits, prompt, formality, count) {
+  const outfitDescriptions = outfits.map((o, i) => {
+    const itemList = o.items
+      .map(item => `${item.brand || ''} ${item.item} (${item.colors.join('/')}${item.pattern && item.pattern !== 'Solid' ? ', ' + item.pattern : ''})`)
+      .join(' + ')
+    return `Outfit ${i}: "${o.title}" — ${itemList}`
+  }).join('\n')
+
+  const critiqueResp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization:  `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model:           'gpt-4o',
+      messages: [{
+        role: 'user',
+        content: `You are a strict fashion editor. Review these outfit combinations for a ${formality} occasion: "${prompt}"
+
+${outfitDescriptions}
+
+Evaluate each outfit ruthlessly:
+- Is it genuinely appropriate and stylish for the occasion?
+- Are the patterns cohesive? (Two bold patterns = instant fail)
+- Is the formality level right for ${formality}?
+- Would a real stylist be proud of this?
+
+Return ONLY a JSON object with the 0-based indices of the outfits that genuinely pass, ranked best first, up to ${count} total:
+{"approved": [2, 0, 4]}`,
+      }],
+      response_format: { type: 'json_object' },
+      max_tokens:      200,
+      temperature:     0.2,
+    }),
+  })
+
+  if (!critiqueResp.ok) return outfits.slice(0, count) // fallback: return first N
+  const data   = await critiqueResp.json()
+  const parsed = JSON.parse(data.choices[0].message.content)
+  const approved = parsed.approved || []
+  return approved.slice(0, count).map(i => outfits[i]).filter(Boolean)
+}
+
 export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions)
   if (!session) return res.status(401).json({ error: 'Unauthorized' })
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { owners = [], categories = [], prompt, count = 4 } = req.body
-  if (!prompt?.trim()) return res.status(400).json({ error: 'Occasion prompt is required' })
+  const { owners = [], categories = [], prompt, count = 4, formality = 'Smart Casual' } = req.body
+  if (!prompt?.trim())    return res.status(400).json({ error: 'Occasion prompt is required' })
   if (!categories.length) return res.status(400).json({ error: 'Select at least one category' })
 
   try {
-    const items = await getEligibleItems(owners, categories)
-    if (!items.length) return res.status(400).json({ error: 'No items found for the selected filters' })
+    const items = await getEligibleItems(owners, categories, formality)
+    if (!items.length) return res.status(400).json({ error: 'No items found for the selected filters — try a less restrictive formality level' })
 
-    // Download and resize all images in parallel (avoids OpenAI size limit)
+    // Download and resize all images in parallel
     const base64Images = await Promise.all(items.map(item => toBase64(item.photoUrl)))
 
-    // Group items by category
+    // Group by category for clearer GPT instructions
     const byCategory = {}
     for (const cat of categories) byCategory[cat] = []
     for (let i = 0; i < items.length; i++) {
@@ -71,11 +129,11 @@ export default async function handler(req, res) {
       if (byCategory[item.item]) byCategory[item.item].push({ item, b64: base64Images[i] })
     }
 
-    // Build GPT-4o multi-modal message — grouped by category so GPT picks correctly
+    // Build GPT-4o multi-modal message
     const content = [
       {
         type: 'text',
-        text: `You are an expert personal stylist. Below are clothing items grouped by category. Study each photo carefully.`,
+        text: `You are an expert personal stylist. Below are clothing items grouped by category. Study each photo carefully — pay close attention to colours, patterns, and textures.`,
       },
     ]
 
@@ -83,31 +141,38 @@ export default async function handler(req, res) {
       content.push({ type: 'text', text: `\n— ${cat.toUpperCase()} (pick exactly one per outfit) —` })
       for (const { item, b64 } of byCategory[cat] || []) {
         const label = [item.brand, item.colors.join('/'), item.pattern].filter(Boolean).join(' · ')
-        content.push({ type: 'text', text: `[${item.id}] ${label}` })
+        content.push({ type: 'text',      text:      `[${item.id}] ${label}` })
         content.push({ type: 'image_url', image_url: { url: b64, detail: 'high' } })
       }
     }
 
+    // Generate count+4 so the critique pass has extras to choose from
+    const generateCount = count + 4
+
     content.push({
       type: 'text',
       text: `Occasion: "${prompt}"
+Formality level: ${formality}
 
-Create exactly ${count} outfit combinations. Each outfit must contain exactly one item from each category above — no exceptions.
+Generate ${generateCount} outfit candidates. Each must contain exactly one item from each category above — no exceptions.
 
-Styling rules:
-- Match the formality level to the occasion
-- Avoid combining two heavily patterned items (e.g. floral + floral, plaid + graphic) — if two patterned items must be used, one should be very subtle
-- Consider colour harmony — complementary or tonal palettes work best
-- Vary combinations across outfits so each suggestion is meaningfully different
-- Only use item IDs listed above — do not invent IDs
+Strict styling rules:
+- MAXIMUM ONE non-solid item per outfit. If one item is patterned (striped, floral, plaid, graphic), all others must be solid. Two patterned items together is never acceptable.
+- Formality must match: ${formality} means ${
+  formality === 'Formal'       ? 'polished and professional — no casual basics' :
+  formality === 'Smart Casual' ? 'put-together but not stiff — no athletic or lounge wear' :
+                                 'relaxed and everyday'
+}
+- Vary combinations — each outfit should feel meaningfully different
+- Only use IDs listed above — do not invent IDs
 
-Return ONLY a valid JSON object, no other text:
+Return ONLY valid JSON:
 {
   "outfits": [
     {
       "items": ["recXXX", "recYYY", "recZZZ"],
-      "title": "Short descriptive outfit name",
-      "description": "2–3 sentences on why this combination works for the occasion and what makes it visually cohesive"
+      "title": "Short descriptive name",
+      "description": "2–3 sentences on why this works for the occasion"
     }
   ]
 }`,
@@ -123,7 +188,7 @@ Return ONLY a valid JSON object, no other text:
         model:           'gpt-4o',
         messages:        [{ role: 'user', content }],
         response_format: { type: 'json_object' },
-        max_tokens:      2000,
+        max_tokens:      3000,
         temperature:     0.8,
       }),
     })
@@ -133,19 +198,27 @@ Return ONLY a valid JSON object, no other text:
     const openaiData = await openaiResp.json()
     const parsed     = JSON.parse(openaiData.choices[0].message.content)
 
-    // Map IDs back to full item data and validate one item per category
+    // Map IDs to full item data
     const itemMap = Object.fromEntries(items.map(i => [i.id, i]))
-    const outfits = parsed.outfits
+    const candidates = parsed.outfits
       .map(outfit => ({
         title:       outfit.title,
         description: outfit.description,
         items:       outfit.items.map(id => itemMap[id]).filter(Boolean),
       }))
       .filter(outfit => {
-        // Ensure exactly one item per selected category
-        const categoriesInOutfit = outfit.items.map(i => i.item)
-        return categories.every(cat => categoriesInOutfit.filter(c => c === cat).length === 1)
+        // Hard rule: exactly one item per category
+        const cats = outfit.items.map(i => i.item)
+        if (!categories.every(cat => cats.filter(c => c === cat).length === 1)) return false
+        // Hard rule: max one non-solid item
+        const nonSolid = outfit.items.filter(i => i.pattern && i.pattern !== 'Solid')
+        return nonSolid.length <= 1
       })
+
+    // Pass 2: critique pass — GPT picks the best from the candidates
+    const outfits = candidates.length > count
+      ? await critiqueOutfits(candidates, prompt, formality, count)
+      : candidates
 
     return res.status(200).json({ outfits })
   } catch (err) {

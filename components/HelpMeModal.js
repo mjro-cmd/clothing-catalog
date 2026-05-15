@@ -3,12 +3,14 @@ import Image from 'next/image'
 import { ITEMS, OWNERS } from '../lib/constants'
 import ItemModal from './ItemModal'
 
-const COUNTS = [4, 6, 8, 10, 12]
+const COUNTS     = [4, 6, 8, 10, 12]
+const FORMALITY  = ['Casual', 'Smart Casual', 'Formal']
 
 export default function HelpMeModal({ onClose, items = [], onSave }) {
   const [view, setView]             = useState('config')
   const [owners, setOwners]         = useState(['PT', 'MJ'])
   const [categories, setCategories] = useState([])
+  const [formality, setFormality]   = useState('Smart Casual')
   const [prompt, setPrompt]         = useState('')
   const [count, setCount]           = useState(4)
   const [outfits, setOutfits]       = useState([])
@@ -37,7 +39,7 @@ export default function HelpMeModal({ onClose, items = [], onSave }) {
       const resp = await fetch('/api/outfits/generate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ owners, categories, prompt, count }),
+        body:    JSON.stringify({ owners, categories, formality, prompt, count }),
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error || 'Generation failed')
@@ -115,6 +117,27 @@ export default function HelpMeModal({ onClose, items = [], onSave }) {
                     }`}
                   >
                     {o}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Formality */}
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Formality</label>
+              <div className="flex gap-2">
+                {FORMALITY.map(f => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFormality(f)}
+                    className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                      formality === f
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    {f}
                   </button>
                 ))}
               </div>
