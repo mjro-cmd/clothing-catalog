@@ -4,7 +4,7 @@ import { ITEMS, OWNERS } from '../lib/constants'
 
 const COUNTS = [4, 6, 8, 10, 12]
 
-export default function HelpMeModal({ onClose }) {
+export default function HelpMeModal({ onClose, onSelectItem }) {
   const [view, setView]             = useState('config')
   const [owners, setOwners]         = useState(['PT', 'MJ'])
   const [categories, setCategories] = useState([])
@@ -198,7 +198,8 @@ export default function HelpMeModal({ onClose }) {
                   {outfit.items.map(item => (
                     <div
                       key={item.id}
-                      className="relative flex-1 aspect-square bg-gray-50 rounded-xl overflow-hidden"
+                      onClick={() => onSelectItem(item.id)}
+                      className="relative flex-1 aspect-square bg-gray-50 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-gray-300 transition-all"
                     >
                       <Image
                         src={item.photoUrl}
