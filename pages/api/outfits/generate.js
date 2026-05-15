@@ -63,37 +63,45 @@ export default async function handler(req, res) {
     // Download and resize all images in parallel (avoids OpenAI size limit)
     const base64Images = await Promise.all(items.map(item => toBase64(item.photoUrl)))
 
-    // Build GPT-4o multi-modal message
+    // Group items by category
+    const byCategory = {}
+    for (const cat of categories) byCategory[cat] = []
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (byCategory[item.item]) byCategory[item.item].push({ item, b64: base64Images[i] })
+    }
+
+    // Build GPT-4o multi-modal message — grouped by category so GPT picks correctly
     const content = [
       {
         type: 'text',
-        text: `You are an expert personal stylist with a sharp eye for colour, pattern, and occasion-appropriate dressing. Study each item below carefully — pay attention to the actual colours, textures, and styles you can see in the photos.`,
+        text: `You are an expert personal stylist. Below are clothing items grouped by category. Study each photo carefully.`,
       },
     ]
 
-    for (let i = 0; i < items.length; i++) {
-      const item  = items[i]
-      const label = [item.brand, item.item, item.colors.join('/'), item.pattern]
-        .filter(Boolean)
-        .join(' · ')
-      content.push({ type: 'text', text: `[${item.id}] ${label}` })
-      content.push({ type: 'image_url', image_url: { url: base64Images[i], detail: 'high' } })
+    for (const cat of categories) {
+      content.push({ type: 'text', text: `\n— ${cat.toUpperCase()} (pick exactly one per outfit) —` })
+      for (const { item, b64 } of byCategory[cat] || []) {
+        const label = [item.brand, item.colors.join('/'), item.pattern].filter(Boolean).join(' · ')
+        content.push({ type: 'text', text: `[${item.id}] ${label}` })
+        content.push({ type: 'image_url', image_url: { url: b64, detail: 'high' } })
+      }
     }
 
     content.push({
       type: 'text',
       text: `Occasion: "${prompt}"
 
-Create exactly ${count} complete outfit combinations using ONLY the items shown above (use the IDs in brackets to reference them).
+Create exactly ${count} outfit combinations. Each outfit must contain exactly one item from each category above — no exceptions.
 
-Rules:
-- Each outfit must include one item from each of these categories: ${categories.join(', ')}
-- Outfits must be appropriate for the described occasion
-- Vary combinations across outfits — avoid reusing the same item in every outfit
-- Consider how colours, patterns, and silhouettes work together visually
-- Only reference item IDs that appear above — do not invent IDs
+Styling rules:
+- Match the formality level to the occasion
+- Avoid combining two heavily patterned items (e.g. floral + floral, plaid + graphic) — if two patterned items must be used, one should be very subtle
+- Consider colour harmony — complementary or tonal palettes work best
+- Vary combinations across outfits so each suggestion is meaningfully different
+- Only use item IDs listed above — do not invent IDs
 
-Return ONLY a valid JSON object in this exact format, no other text:
+Return ONLY a valid JSON object, no other text:
 {
   "outfits": [
     {
@@ -125,13 +133,19 @@ Return ONLY a valid JSON object in this exact format, no other text:
     const openaiData = await openaiResp.json()
     const parsed     = JSON.parse(openaiData.choices[0].message.content)
 
-    // Map IDs back to full item data
+    // Map IDs back to full item data and validate one item per category
     const itemMap = Object.fromEntries(items.map(i => [i.id, i]))
-    const outfits = parsed.outfits.map(outfit => ({
-      title:       outfit.title,
-      description: outfit.description,
-      items:       outfit.items.map(id => itemMap[id]).filter(Boolean),
-    }))
+    const outfits = parsed.outfits
+      .map(outfit => ({
+        title:       outfit.title,
+        description: outfit.description,
+        items:       outfit.items.map(id => itemMap[id]).filter(Boolean),
+      }))
+      .filter(outfit => {
+        // Ensure exactly one item per selected category
+        const categoriesInOutfit = outfit.items.map(i => i.item)
+        return categories.every(cat => categoriesInOutfit.filter(c => c === cat).length === 1)
+      })
 
     return res.status(200).json({ outfits })
   } catch (err) {
