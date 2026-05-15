@@ -7,7 +7,7 @@ async function toBase64(url) {
   if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`)
   const buffer = Buffer.from(await resp.arrayBuffer())
   const resized = await sharp(buffer)
-    .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+    .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 85 })
     .toBuffer()
   return `data:image/jpeg;base64,${resized.toString('base64')}`
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
       for (const { item, b64 } of byCategory[cat] || []) {
         const label = [item.brand, item.colors.join('/'), item.pattern].filter(Boolean).join(' · ')
         content.push({ type: 'text',      text:      `[${item.id}] ${label}` })
-        content.push({ type: 'image_url', image_url: { url: b64, detail: 'high' } })
+        content.push({ type: 'image_url', image_url: { url: b64, detail: 'low' } })
       }
     }
 
