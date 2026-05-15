@@ -4,6 +4,7 @@ import { getAllItems } from '../lib/airtable'
 import ClothingCard from '../components/ClothingCard'
 import FilterBar from '../components/FilterBar'
 import ItemModal from '../components/ItemModal'
+import HelpMeModal from '../components/HelpMeModal'
 
 
 const EMPTY_FILTERS = { owner: [], item: [], color: [], pattern: [], brand: [] }
@@ -13,6 +14,7 @@ export default function Home({ initialItems }) {
   const [filters, setFilters]       = useState(EMPTY_FILTERS)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selected, setSelected]     = useState(null)
+  const [helpMeOpen, setHelpMeOpen] = useState(false)
 
   const brands = useMemo(() => {
     const set = new Set(items.map((i) => i.brand).filter(Boolean))
@@ -62,6 +64,12 @@ export default function Home({ initialItems }) {
             <p className="text-xs text-gray-300">PT & MJ</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setHelpMeOpen(true)}
+              className="flex items-center gap-1.5 text-xs border rounded-full px-3 py-1.5 border-gray-200 text-gray-400 hover:border-gray-400 transition-colors"
+            >
+              Help Me
+            </button>
             <button
               onClick={() => setFiltersOpen((o) => !o)}
               className={`flex items-center gap-1.5 text-xs border rounded-full px-3 py-1.5 transition-colors ${
@@ -128,6 +136,9 @@ export default function Home({ initialItems }) {
           onSave={handleSave}
         />
       )}
+
+      {/* Help Me modal */}
+      {helpMeOpen && <HelpMeModal onClose={() => setHelpMeOpen(false)} />}
     </div>
   )
 }
