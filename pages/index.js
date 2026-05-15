@@ -141,10 +141,8 @@ export default function Home({ initialItems }) {
       {helpMeOpen && (
         <HelpMeModal
           onClose={() => setHelpMeOpen(false)}
-          onSelectItem={(id) => {
-            const item = items.find((i) => i.id === id)
-            if (item) { setHelpMeOpen(false); setSelected(item) }
-          }}
+          items={items}
+          onSave={handleSave}
         />
       )}
     </div>

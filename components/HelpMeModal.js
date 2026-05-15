@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { ITEMS, OWNERS } from '../lib/constants'
+import ItemModal from './ItemModal'
 
 const COUNTS = [4, 6, 8, 10, 12]
 
-export default function HelpMeModal({ onClose, onSelectItem }) {
+export default function HelpMeModal({ onClose, items = [], onSave }) {
   const [view, setView]             = useState('config')
   const [owners, setOwners]         = useState(['PT', 'MJ'])
   const [categories, setCategories] = useState([])
@@ -12,6 +13,7 @@ export default function HelpMeModal({ onClose, onSelectItem }) {
   const [count, setCount]           = useState(4)
   const [outfits, setOutfits]       = useState([])
   const [error, setError]           = useState(null)
+  const [selectedItem, setSelectedItem] = useState(null)
 
   function toggleOwner(owner) {
     setOwners(prev =>
@@ -50,6 +52,7 @@ export default function HelpMeModal({ onClose, onSelectItem }) {
   const canGenerate = prompt.trim().length > 0 && categories.length > 0
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
@@ -198,7 +201,7 @@ export default function HelpMeModal({ onClose, onSelectItem }) {
                   {outfit.items.map(item => (
                     <div
                       key={item.id}
-                      onClick={() => onSelectItem(item.id)}
+                      onClick={() => setSelectedItem(items.find(i => i.id === item.id) || item)}
                       className="relative flex-1 aspect-square bg-gray-50 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-gray-300 transition-all"
                     >
                       <Image
@@ -229,5 +232,15 @@ export default function HelpMeModal({ onClose, onSelectItem }) {
 
       </div>
     </div>
+
+    {/* Item detail — rendered on top, closing returns to outfits */}
+    {selectedItem && (
+      <ItemModal
+        item={selectedItem}
+        onClose={() => setSelectedItem(null)}
+        onSave={(updated) => { setSelectedItem(null); onSave?.(updated) }}
+      />
+    )}
+    </>
   )
 }
