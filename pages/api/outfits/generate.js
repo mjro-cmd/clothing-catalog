@@ -1,5 +1,17 @@
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]'
+import sharp from 'sharp'
+
+async function toBase64(url) {
+  const resp = await fetch(url)
+  if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`)
+  const buffer = Buffer.from(await resp.arrayBuffer())
+  const resized = await sharp(buffer)
+    .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer()
+  return `data:image/jpeg;base64,${resized.toString('base64')}`
+}
 
 const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodeURIComponent(process.env.AIRTABLE_TABLE_NAME)}`
 
@@ -48,6 +60,9 @@ export default async function handler(req, res) {
     const items = await getEligibleItems(owners, categories)
     if (!items.length) return res.status(400).json({ error: 'No items found for the selected filters' })
 
+    // Download and resize all images in parallel (avoids OpenAI size limit)
+    const base64Images = await Promise.all(items.map(item => toBase64(item.photoUrl)))
+
     // Build GPT-4o multi-modal message
     const content = [
       {
@@ -56,12 +71,13 @@ export default async function handler(req, res) {
       },
     ]
 
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item  = items[i]
       const label = [item.brand, item.item, item.colors.join('/'), item.pattern]
         .filter(Boolean)
         .join(' · ')
       content.push({ type: 'text', text: `[${item.id}] ${label}` })
-      content.push({ type: 'image_url', image_url: { url: item.photoUrl, detail: 'high' } })
+      content.push({ type: 'image_url', image_url: { url: base64Images[i], detail: 'high' } })
     }
 
     content.push({
