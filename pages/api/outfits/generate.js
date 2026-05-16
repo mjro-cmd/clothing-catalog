@@ -210,24 +210,41 @@ Return ONLY valid JSON:
     // Map IDs to full item data
     const itemMap = Object.fromEntries(items.map(i => [i.id, i]))
     const candidates = parsed.outfits
-      .map(outfit => ({
-        title:       outfit.title,
-        description: outfit.description,
-        items:       outfit.items.map(id => itemMap[id]).filter(Boolean),
-      }))
+      .map(outfit => {
+        const resolved = outfit.items.map(id => itemMap[id]).filter(Boolean)
+        if (resolved.length !== outfit.items.length) {
+          console.log(`[outfit-gen] Dropped outfit "${outfit.title}": ${outfit.items.length - resolved.length} unknown IDs — ${outfit.items.filter(id => !itemMap[id]).join(', ')}`)
+        }
+        return { title: outfit.title, description: outfit.description, items: resolved }
+      })
       .filter(outfit => {
-        // Hard rule: exactly one item per category
         const cats = outfit.items.map(i => i.item)
-        if (!categories.every(cat => cats.filter(c => c === cat).length === 1)) return false
-        // Hard rule: max one non-solid item
+        if (!categories.every(cat => cats.filter(c => c === cat).length === 1)) {
+          console.log(`[outfit-gen] Filtered out "${outfit.title}": category mismatch — got [${[...new Set(cats)].join(', ')}], need [${categories.join(', ')}]`)
+          return false
+        }
         const nonSolid = outfit.items.filter(i => i.pattern && i.pattern !== 'Solid')
-        return nonSolid.length <= 1
+        if (nonSolid.length > 1) {
+          console.log(`[outfit-gen] Filtered out "${outfit.title}": ${nonSolid.length} non-solid patterns`)
+          return false
+        }
+        return true
       })
 
+    console.log(`[outfit-gen] GPT generated ${parsed.outfits.length} raw, ${candidates.length} passed hard filter`)
+
     // Pass 2: critique pass — GPT picks the best from the candidates
-    const outfits = candidates.length > count
-      ? await critiqueOutfits(candidates, prompt, formality, count)
-      : candidates
+    let outfits
+    if (candidates.length > count) {
+      outfits = await critiqueOutfits(candidates, prompt, formality, count)
+      console.log(`[outfit-gen] Critique pass: ${candidates.length} in, ${outfits.length} approved`)
+      if (outfits.length === 0) {
+        console.log(`[outfit-gen] Critique returned 0 — falling back to first ${count} candidates`)
+        outfits = candidates.slice(0, count)
+      }
+    } else {
+      outfits = candidates
+    }
 
     return res.status(200).json({ outfits })
   } catch (err) {
