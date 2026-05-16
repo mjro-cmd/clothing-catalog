@@ -138,7 +138,7 @@ export default async function handler(req, res) {
     ]
 
     for (const cat of categories) {
-      content.push({ type: 'text', text: `\n— ${cat.toUpperCase()} (pick exactly one per outfit) —` })
+      content.push({ type: 'text', text: `\n— ${cat.toUpperCase()} —` })
       for (const { item, b64 } of byCategory[cat] || []) {
         const label = [item.brand, item.colors.join('/'), item.pattern].filter(Boolean).join(' · ')
         content.push({ type: 'text',      text:      `[${item.id}] ${label}` })
@@ -154,7 +154,7 @@ export default async function handler(req, res) {
       text: `Occasion: "${prompt}"
 Formality level: ${formality}
 
-Generate ${generateCount} outfit candidates. Each must contain exactly one item from each category above — no exceptions.
+Generate ${generateCount} outfit candidates. For each outfit, pick ONE item from each category — but when categories serve the same role (e.g. Blouse and Shirt are both tops), pick from ONE of those categories, not both. No outfit should have two items filling the same role.
 
 Strict styling rules:
 - MAXIMUM ONE non-solid item per outfit. If one item is patterned (striped, floral, plaid, graphic), all others must be solid. Two patterned items together is never acceptable.
@@ -219,8 +219,13 @@ Return ONLY valid JSON:
       })
       .filter(outfit => {
         const cats = outfit.items.map(i => i.item)
-        if (!categories.every(cat => cats.filter(c => c === cat).length === 1)) {
-          console.log(`[outfit-gen] Filtered out "${outfit.title}": category mismatch — got [${[...new Set(cats)].join(', ')}], need [${categories.join(', ')}]`)
+        const uniqueCats = new Set(cats)
+        if (uniqueCats.size !== cats.length) {
+          console.log(`[outfit-gen] Filtered out "${outfit.title}": duplicate category — [${cats.join(', ')}]`)
+          return false
+        }
+        if (!cats.every(c => categories.includes(c))) {
+          console.log(`[outfit-gen] Filtered out "${outfit.title}": item from non-selected category — got [${cats.join(', ')}], allowed [${categories.join(', ')}]`)
           return false
         }
         const nonSolid = outfit.items.filter(i => i.pattern && i.pattern !== 'Solid')
