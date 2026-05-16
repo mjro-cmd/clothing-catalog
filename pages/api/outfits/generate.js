@@ -7,8 +7,8 @@ async function toBase64(url) {
   if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`)
   const buffer = Buffer.from(await resp.arrayBuffer())
   const resized = await sharp(buffer)
-    .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 85 })
+    .resize(150, 150, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 60 })
     .toBuffer()
   return `data:image/jpeg;base64,${resized.toString('base64')}`
 }
@@ -185,7 +185,7 @@ Return ONLY valid JSON:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model:           'gpt-4o',
+        model:           'gpt-4o-mini',
         messages:        [{ role: 'user', content }],
         response_format: { type: 'json_object' },
         max_tokens:      3000,
