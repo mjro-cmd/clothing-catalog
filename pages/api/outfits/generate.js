@@ -193,10 +193,19 @@ Return ONLY valid JSON:
       }),
     })
 
-    if (!openaiResp.ok) throw new Error(`OpenAI error: ${await openaiResp.text()}`)
+    const openaiText = await openaiResp.text()
+    if (!openaiResp.ok) throw new Error(`OpenAI error: ${openaiText}`)
 
-    const openaiData = await openaiResp.json()
-    const parsed     = JSON.parse(openaiData.choices[0].message.content)
+    let openaiData
+    try { openaiData = JSON.parse(openaiText) }
+    catch { throw new Error(`OpenAI returned non-JSON: ${openaiText.slice(0, 300)}`) }
+
+    const rawContent = openaiData.choices?.[0]?.message?.content
+    if (!rawContent) throw new Error(`OpenAI empty response: ${JSON.stringify(openaiData).slice(0, 300)}`)
+
+    let parsed
+    try { parsed = JSON.parse(rawContent) }
+    catch { throw new Error(`OpenAI content not JSON: ${rawContent.slice(0, 300)}`) }
 
     // Map IDs to full item data
     const itemMap = Object.fromEntries(items.map(i => [i.id, i]))
