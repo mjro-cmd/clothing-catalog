@@ -238,5 +238,5 @@ Return ONLY valid JSON:
 
 export const config = {
   api:         { responseLimit: false },
-  maxDuration: 60,
+  maxDuration: 300,
 }
